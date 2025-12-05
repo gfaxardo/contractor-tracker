@@ -1,5 +1,7 @@
 package com.yego.contractortracker.controller;
 
+import com.yego.contractortracker.dto.ScoutProfileDTO;
+import com.yego.contractortracker.dto.ScoutProfileUpdateDTO;
 import com.yego.contractortracker.entity.Scout;
 import com.yego.contractortracker.service.ScoutService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,6 +121,48 @@ public class ScoutController {
         } catch (Exception e) {
             response.put("status", "error");
             response.put("message", "Error al obtener drivers: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+    
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<Map<String, Object>> getScoutProfile(@PathVariable String id) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            ScoutProfileDTO profile = scoutService.obtenerPerfilCompleto(id);
+            response.put("status", "success");
+            response.put("data", profile);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(404).body(response);
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "Error al obtener perfil del scout: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+    
+    @PutMapping("/{id}/profile")
+    public ResponseEntity<Map<String, Object>> updateScoutProfile(
+            @PathVariable String id,
+            @RequestBody ScoutProfileUpdateDTO updateDTO) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            ScoutProfileDTO updatedProfile = scoutService.actualizarPerfil(id, updateDTO);
+            response.put("status", "success");
+            response.put("data", updatedProfile);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(404).body(response);
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "Error al actualizar perfil del scout: " + e.getMessage());
             return ResponseEntity.status(500).body(response);
         }
     }

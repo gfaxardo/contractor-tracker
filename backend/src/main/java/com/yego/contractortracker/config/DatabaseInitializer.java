@@ -292,6 +292,7 @@ public class DatabaseInitializer {
             initializeScoutsTable();
             initializeYangoTransactionsTable();
             initializeScoutPaymentConfigTable();
+            initializeYangoPaymentConfigTable();
             initializeScoutPaymentsTable();
             initializeScoutPaymentInstancesTable();
             initializeScoutRegistrationsTable();
@@ -360,8 +361,39 @@ public class DatabaseInitializer {
             for (String indexSql : indexStatements) {
                 crearIndiceConTimeout(indexSql, "scouts");
             }
+            
+            // Agregar nuevas columnas para el perfil de scouts
+            agregarColumnasPerfilScout();
+            
         } catch (Exception e) {
             logger.error("Error al inicializar tabla scouts: {}", e.getMessage(), e);
+        }
+    }
+    
+    private void agregarColumnasPerfilScout() {
+        try {
+            logger.info("Agregando columnas de perfil a la tabla scouts...");
+            
+            // Datos de Contacto
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS email VARCHAR(255)");
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS phone VARCHAR(255)");
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS address VARCHAR(500)");
+            
+            // Datos Operacionales
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS notes TEXT");
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS start_date DATE");
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS status VARCHAR(100)");
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS contract_type VARCHAR(100)");
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS work_type VARCHAR(50)");
+            
+            // Configuración
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS payment_method VARCHAR(100)");
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS bank_account VARCHAR(255)");
+            jdbcTemplate.execute("ALTER TABLE scouts ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(10,4)");
+            
+            logger.info("Columnas de perfil agregadas exitosamente a la tabla scouts");
+        } catch (Exception e) {
+            logger.warn("Advertencia al agregar columnas de perfil a scouts: {}", e.getMessage());
         }
     }
     
@@ -470,9 +502,7 @@ public class DatabaseInitializer {
                     "INSERT INTO scout_payment_config (milestone_type, amount_scout, payment_days, is_active, min_registrations_required, min_connection_seconds) " +
                     "VALUES (5, 7.50, 7, true, 8, 1) ON CONFLICT (milestone_type) DO UPDATE SET amount_scout = EXCLUDED.amount_scout, min_registrations_required = EXCLUDED.min_registrations_required, min_connection_seconds = EXCLUDED.min_connection_seconds",
                     "INSERT INTO scout_payment_config (milestone_type, amount_scout, payment_days, is_active, min_registrations_required, min_connection_seconds) " +
-                    "VALUES (10, 10.00, 7, true, 8, 1) ON CONFLICT (milestone_type) DO UPDATE SET amount_scout = EXCLUDED.amount_scout, min_registrations_required = EXCLUDED.min_registrations_required, min_connection_seconds = EXCLUDED.min_connection_seconds",
-                    "INSERT INTO scout_payment_config (milestone_type, amount_scout, payment_days, is_active, min_registrations_required, min_connection_seconds) " +
-                    "VALUES (25, 90.00, 7, true, 8, 1) ON CONFLICT (milestone_type) DO NOTHING"
+                    "VALUES (25, 10.00, 7, true, 8, 1) ON CONFLICT (milestone_type) DO UPDATE SET amount_scout = EXCLUDED.amount_scout, min_registrations_required = EXCLUDED.min_registrations_required, min_connection_seconds = EXCLUDED.min_connection_seconds"
                 };
                 
                 for (String insertSql : insertStatements) {
@@ -489,6 +519,72 @@ public class DatabaseInitializer {
             }
         } catch (Exception e) {
             logger.warn("Error al inicializar datos de configuración de pagos: {}", e.getMessage());
+        }
+    }
+    
+    private void initializeYangoPaymentConfigTable() {
+        try {
+            String createTableSql = "CREATE TABLE IF NOT EXISTS yango_payment_config (" +
+                "id BIGSERIAL PRIMARY KEY, " +
+                "milestone_type INTEGER NOT NULL CHECK (milestone_type IN (1, 5, 25)), " +
+                "amount_yango DECIMAL(10,2) NOT NULL, " +
+                "period_days INTEGER NOT NULL DEFAULT 14, " +
+                "is_active BOOLEAN DEFAULT true, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "UNIQUE(milestone_type, period_days)" +
+                ")";
+            
+            jdbcTemplate.execute(createTableSql);
+            logger.info("Tabla yango_payment_config creada o ya existe");
+            
+            String[] indexStatements = {
+                "CREATE INDEX IF NOT EXISTS idx_yango_payment_config_milestone ON yango_payment_config(milestone_type)",
+                "CREATE INDEX IF NOT EXISTS idx_yango_payment_config_period ON yango_payment_config(period_days)",
+                "CREATE INDEX IF NOT EXISTS idx_yango_payment_config_active ON yango_payment_config(is_active)"
+            };
+            
+            for (String indexSql : indexStatements) {
+                crearIndiceConTimeout(indexSql, "yango_payment_config");
+            }
+            
+            inicializarDatosConfiguracionPagosYango();
+        } catch (Exception e) {
+            logger.error("Error al inicializar tabla yango_payment_config: {}", e.getMessage(), e);
+        }
+    }
+    
+    private void inicializarDatosConfiguracionPagosYango() {
+        try {
+            String checkSql = "SELECT COUNT(*) FROM yango_payment_config";
+            Integer count = jdbcTemplate.queryForObject(checkSql, Integer.class);
+            
+            if (count == null || count == 0) {
+                logger.info("Inicializando datos por defecto de configuración de pagos de Yango...");
+                
+                String[] insertStatements = {
+                    "INSERT INTO yango_payment_config (milestone_type, amount_yango, period_days, is_active) " +
+                    "VALUES (1, 25.00, 14, true) ON CONFLICT (milestone_type, period_days) DO UPDATE SET amount_yango = EXCLUDED.amount_yango",
+                    "INSERT INTO yango_payment_config (milestone_type, amount_yango, period_days, is_active) " +
+                    "VALUES (5, 35.00, 14, true) ON CONFLICT (milestone_type, period_days) DO UPDATE SET amount_yango = EXCLUDED.amount_yango",
+                    "INSERT INTO yango_payment_config (milestone_type, amount_yango, period_days, is_active) " +
+                    "VALUES (25, 100.00, 14, true) ON CONFLICT (milestone_type, period_days) DO UPDATE SET amount_yango = EXCLUDED.amount_yango"
+                };
+                
+                for (String insertSql : insertStatements) {
+                    try {
+                        jdbcTemplate.execute(insertSql);
+                    } catch (Exception e) {
+                        logger.warn("Advertencia al insertar configuración de pago Yango: {}", e.getMessage());
+                    }
+                }
+                
+                logger.info("Datos por defecto de configuración de pagos Yango inicializados");
+            } else {
+                logger.debug("Configuración de pagos Yango ya tiene datos, omitiendo inicialización");
+            }
+        } catch (Exception e) {
+            logger.warn("Error al inicializar datos de configuración de pagos Yango: {}", e.getMessage());
         }
     }
     

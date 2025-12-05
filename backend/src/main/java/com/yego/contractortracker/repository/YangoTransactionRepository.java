@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface YangoTransactionRepository extends JpaRepository<YangoTransaction, Long> {
@@ -17,6 +18,8 @@ public interface YangoTransactionRepository extends JpaRepository<YangoTransacti
     List<YangoTransaction> findByScoutId(String scoutId);
     
     List<YangoTransaction> findByDriverId(String driverId);
+    
+    List<YangoTransaction> findByDriverIdIn(List<String> driverIds);
     
     List<YangoTransaction> findByMilestoneType(Integer milestoneType);
     

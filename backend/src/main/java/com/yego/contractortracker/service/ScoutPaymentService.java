@@ -162,40 +162,59 @@ public class ScoutPaymentService {
             throw new RuntimeException("No se encontraron instancias con los IDs proporcionados");
         }
         
-        BigDecimal totalAmount = instancias.stream()
+        // Filtrar solo instancias pendientes
+        List<ScoutPaymentInstance> instanciasPendientes = instancias.stream()
+                .filter(i -> "pending".equals(i.getStatus()))
+                .collect(Collectors.toList());
+        
+        if (instanciasPendientes.isEmpty()) {
+            throw new RuntimeException("No hay instancias pendientes para procesar. Todas las instancias seleccionadas ya fueron pagadas o canceladas.");
+        }
+        
+        // Verificar que todas las instancias pertenezcan al scout especificado
+        for (ScoutPaymentInstance instance : instanciasPendientes) {
+            if (!scoutId.equals(instance.getScoutId())) {
+                throw new IllegalArgumentException("Todas las instancias deben pertenecer al scout especificado");
+            }
+        }
+        
+        BigDecimal totalAmount = instanciasPendientes.stream()
                 .map(ScoutPaymentInstance::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         
-        LocalDate fechaInicio = instancias.stream()
+        LocalDate fechaInicio = instanciasPendientes.stream()
                 .map(ScoutPaymentInstance::getRegistrationDate)
                 .min(LocalDate::compareTo)
                 .orElse(LocalDate.now());
         
-        LocalDate fechaFin = instancias.stream()
+        LocalDate fechaFin = instanciasPendientes.stream()
                 .map(ScoutPaymentInstance::getRegistrationDate)
                 .max(LocalDate::compareTo)
                 .orElse(LocalDate.now());
+        
+        List<Long> pendingInstanceIds = instanciasPendientes.stream()
+                .map(ScoutPaymentInstance::getId)
+                .collect(Collectors.toList());
         
         ScoutPayment pago = new ScoutPayment();
         pago.setScoutId(scoutId);
         pago.setPaymentPeriodStart(fechaInicio);
         pago.setPaymentPeriodEnd(fechaFin);
         pago.setTotalAmount(totalAmount);
-        pago.setTransactionsCount(instancias.size());
+        pago.setTransactionsCount(instanciasPendientes.size());
         pago.setStatus("pending");
-        pago.setInstanceIds(instanceIds);
+        pago.setInstanceIds(pendingInstanceIds);
         pago.setCreatedAt(LocalDateTime.now());
         pago.setLastUpdated(LocalDateTime.now());
         
         ScoutPayment savedPayment = paymentRepository.save(pago);
         
-        for (ScoutPaymentInstance instance : instancias) {
-            if ("pending".equals(instance.getStatus())) {
-                instance.setStatus("paid");
-                instance.setPaymentId(savedPayment.getId());
-                instance.setLastUpdated(LocalDateTime.now());
-                instanceRepository.save(instance);
-            }
+        // Marcar todas las instancias pendientes como pagadas
+        for (ScoutPaymentInstance instance : instanciasPendientes) {
+            instance.setStatus("paid");
+            instance.setPaymentId(savedPayment.getId());
+            instance.setLastUpdated(LocalDateTime.now());
+            instanceRepository.save(instance);
         }
         
         return savedPayment;

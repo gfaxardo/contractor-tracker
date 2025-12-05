@@ -46,6 +46,9 @@ public class LeadProcessingService {
     @Autowired
     private YangoTransactionService yangoTransactionService;
     
+    @Autowired
+    private YangoTransactionRematchService yangoTransactionRematchService;
+    
     @Transactional
     public LeadProcessingResultDTO procesarArchivoCSV(MultipartFile file) {
         logger.info("Iniciando procesamiento de archivo CSV: {}", file.getOriginalFilename());
@@ -165,6 +168,11 @@ public class LeadProcessingService {
             LocalDateTime lastUpdated = LocalDateTime.now();
             
             logger.info("Procesamiento completado. Matched: {}, Unmatched: {}", matchedCount, unmatchedCount);
+            
+            // Iniciar re-matching automático de transacciones Yango después de procesar leads
+            String rematchJobId = "yango-rematch-leads-" + System.currentTimeMillis();
+            logger.info("Iniciando re-matching automático de transacciones Yango. JobId: {}", rematchJobId);
+            yangoTransactionRematchService.rematchAllTransactionsAsync(rematchJobId);
             
             return new LeadProcessingResultDTO(
                 leads.size(),
@@ -986,6 +994,11 @@ public class LeadProcessingService {
                 unmatchedCount++;
             }
         }
+        
+        // Iniciar re-matching automático de transacciones Yango después de reprocesar leads
+        String rematchJobId = "yango-rematch-reprocess-" + System.currentTimeMillis();
+        logger.info("Iniciando re-matching automático de transacciones Yango después de reprocesamiento. JobId: {}", rematchJobId);
+        yangoTransactionRematchService.rematchAllTransactionsAsync(rematchJobId);
         
         return new LeadProcessingResultDTO(
                 leadsToReprocess.size(),

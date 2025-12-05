@@ -49,6 +49,9 @@ public class YangoTransactionService {
     @Autowired
     private ScoutRegistrationRepository scoutRegistrationRepository;
     
+    @Autowired
+    private YangoPaymentConfigService yangoPaymentConfigService;
+    
     @Transactional
     public Map<String, Object> procesarArchivoCSV(MultipartFile file) {
         long startTime = System.currentTimeMillis();
@@ -350,7 +353,9 @@ public class YangoTransactionService {
                     transaccion.setMilestoneType(milestoneType);
                     
                     if (milestoneType != null) {
-                        BigDecimal amount = calcularMontoYango(milestoneType);
+                        // Usar 14 días por defecto (period_days de los milestones de 14 días)
+                        Integer periodDays = 14;
+                        BigDecimal amount = yangoPaymentConfigService.calcularMontoYangoAcumulativo(milestoneType, periodDays);
                         transaccion.setAmountYango(amount);
                     }
                 }
@@ -462,21 +467,18 @@ public class YangoTransactionService {
         return null;
     }
     
+    /**
+     * @deprecated Usar YangoPaymentConfigService.calcularMontoYangoAcumulativo en su lugar
+     * Este método se mantiene por compatibilidad pero ya no se usa
+     */
+    @Deprecated
     private BigDecimal calcularMontoYango(Integer milestoneType) {
         if (milestoneType == null) {
             return BigDecimal.ZERO;
         }
         
-        switch (milestoneType) {
-            case 1:
-                return new BigDecimal("25.00");
-            case 5:
-                return new BigDecimal("35.00");
-            case 25:
-                return new BigDecimal("100.00");
-            default:
-                return BigDecimal.ZERO;
-        }
+        // Usar el servicio de configuración con 14 días por defecto
+        return yangoPaymentConfigService.calcularMontoYangoAcumulativo(milestoneType, 14);
     }
     
     private Scout identificarOCrearScout(String nombreScout) {

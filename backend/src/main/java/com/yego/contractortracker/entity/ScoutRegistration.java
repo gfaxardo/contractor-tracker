@@ -46,16 +46,16 @@ public class ScoutRegistration {
     @Column(name = "is_matched", nullable = false)
     private Boolean isMatched = false;
     
-    @Column(name = "match_source")
+    @Transient
     private String matchSource;
     
-    @Column(name = "reconciliation_status")
+    @Transient
     private String reconciliationStatus;
     
-    @Column(name = "yango_transaction_id")
+    @Transient
     private Long yangoTransactionId;
     
-    @Column(name = "is_reconciled")
+    @Transient
     private Boolean isReconciled = false;
     
     @Column(name = "created_at", nullable = false)

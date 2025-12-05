@@ -16,7 +16,5 @@ public interface ScoutRegistrationRepository extends JpaRepository<ScoutRegistra
     List<ScoutRegistration> findByIsMatched(Boolean isMatched);
     List<ScoutRegistration> findByScoutIdAndDriverId(String scoutId, String driverId);
     List<ScoutRegistration> findByScoutIdAndDriverIdAndRegistrationDateBetween(String scoutId, String driverId, LocalDate fechaInicio, LocalDate fechaFin);
-    List<ScoutRegistration> findByMatchSource(String matchSource);
-    List<ScoutRegistration> findByReconciliationStatus(String reconciliationStatus);
 }
 

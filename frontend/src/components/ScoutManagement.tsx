@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, Scout } from '../services/api';
+import ScoutProfile from './ScoutProfile';
 
 const ScoutManagement: React.FC = () => {
   const [scouts, setScouts] = useState<Scout[]>([]);
@@ -7,6 +8,7 @@ const ScoutManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingScout, setEditingScout] = useState<Scout | null>(null);
   const [newScoutName, setNewScoutName] = useState('');
+  const [selectedScoutId, setSelectedScoutId] = useState<string | null>(null);
 
   useEffect(() => {
     cargarScouts().catch((err) => {
@@ -51,6 +53,18 @@ const ScoutManagement: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Error al actualizar scout');
     }
   };
+
+  if (selectedScoutId) {
+    return (
+      <ScoutProfile 
+        scoutId={selectedScoutId} 
+        onBack={() => {
+          setSelectedScoutId(null);
+          cargarScouts();
+        }} 
+      />
+    );
+  }
 
   return (
     <div className="card">
@@ -153,13 +167,22 @@ const ScoutManagement: React.FC = () => {
                     <td>{scout.driverId || 'N/A'}</td>
                     <td>{scout.isActive ? 'Sí' : 'No'}</td>
                     <td>
-                      <button
-                        onClick={() => setEditingScout(scout)}
-                        className="btn"
-                        style={{ padding: '6px 12px', fontSize: '13px' }}
-                      >
-                        Editar
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => setSelectedScoutId(scout.scoutId)}
+                          className="btn"
+                          style={{ padding: '6px 12px', fontSize: '13px', backgroundColor: '#2563eb' }}
+                        >
+                          Ver Perfil
+                        </button>
+                        <button
+                          onClick={() => setEditingScout(scout)}
+                          className="btn"
+                          style={{ padding: '6px 12px', fontSize: '13px' }}
+                        >
+                          Editar
+                        </button>
+                      </div>
                     </td>
                   </>
                 )}

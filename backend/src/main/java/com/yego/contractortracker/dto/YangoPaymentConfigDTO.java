@@ -10,20 +10,13 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class YangoTransactionMatchedDTO {
+public class YangoPaymentConfigDTO {
     private Long id;
-    private LocalDateTime transactionDate;
     private Integer milestoneType;
     private BigDecimal amountYango;
-    private Long milestoneInstanceId;
-    private MilestoneInstanceDTO milestoneInstance;
+    private Integer periodDays;
+    private Boolean isActive;
+    private LocalDateTime createdAt;
+    private LocalDateTime lastUpdated;
 }
-
-
-
-
-
-
-
-
 
