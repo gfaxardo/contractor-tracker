@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api, ReconciliationSummary } from '../services/api';
-import { getCurrentWeekISO, formatWeekISO, getWeekRange, getLastNWeeks } from '../utils/weekUtils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart, Area, AreaChart } from 'recharts';
+import { formatWeekISO, getLastNWeeks } from '../utils/weekUtils';
+import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart } from 'recharts';
 
 const DEFAULT_PARK_ID = '08e20910d81d42658d4334d3f6d10ac0';
 
@@ -96,22 +96,6 @@ const ReconciliationDashboard: React.FC = () => {
   const formatPercent = (num: number) => {
     return num.toFixed(2) + '%';
   };
-
-  const chartData = useMemo(() => {
-    return summaries.map(s => ({
-      periodo: s.periodType === 'week' ? formatWeekISO(s.period) : s.period,
-      registrados: s.totals.registrados,
-      conectados: s.totals.conectados,
-      viajes14d: s.totals.conViajes14d,
-      milestone1: s.totals.conMilestone1,
-      milestone5: s.totals.conMilestone5,
-      milestone25: s.totals.conMilestone25,
-      pagoYango: s.totals.conPagoYango,
-      tasaConexion: s.conversionMetrics.tasaConexion,
-      tasaActivacion: s.conversionMetrics.tasaActivacion,
-      tasaPago: s.conversionMetrics.tasaPagoYango
-    }));
-  }, [summaries]);
 
   const funnelData = useMemo(() => {
     return summaries.map(s => ({

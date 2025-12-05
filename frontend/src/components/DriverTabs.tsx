@@ -17,10 +17,10 @@ const DriverTabs: React.FC<DriverTabsProps> = ({ drivers, activeTab, onTabChange
       
       if (d.status14d === 'activo_con_viajes') return true;
       
-      const tieneMilestone = (milestones?: any[]) => {
-        return milestones && milestones.length > 0 && milestones.some(m => 
+      const tieneMilestone = (milestones?: any[]): boolean => {
+        return !!(milestones && milestones.length > 0 && milestones.some(m => 
           m.milestoneType === 1 || m.milestoneType === 5 || m.milestoneType === 25
-        );
+        ));
       };
       
       return tieneMilestone(d.milestones14d) || tieneMilestone(d.milestones7d);

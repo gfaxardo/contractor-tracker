@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DriverOnboarding, MilestoneInstance, YangoTransactionMatched } from '../services/api';
+import { DriverOnboarding, MilestoneInstance } from '../services/api';
 import { TabState } from './DriverTabs';
 import { MilestoneType } from './MilestoneSubTabs';
 import EvolutionMetrics from './EvolutionMetrics';
@@ -301,15 +301,15 @@ const DriverTable: React.FC<DriverTableProps> = ({ drivers, allDrivers, allDrive
     const viajes = d.totalTrips14d ?? 0;
     if (viajes >= 1) return true;
     if (d.status14d === 'activo_con_viajes') return true;
-    const tieneMilestone = (milestones?: MilestoneInstance[]) => {
-      return milestones && milestones.length > 0 && milestones.some(m => 
+    const tieneMilestone = (milestones?: MilestoneInstance[]): boolean => {
+      return !!(milestones && milestones.length > 0 && milestones.some(m => 
         m.milestoneType === 1 || m.milestoneType === 5 || m.milestoneType === 25
-      );
+      ));
     };
     return tieneMilestone(d.milestones14d) || tieneMilestone(d.milestones7d);
   };
 
-  const alcanzoMilestone = (d: DriverOnboarding, milestoneType: number, period: number): boolean => {
+  const alcanzoMilestone = (d: DriverOnboarding, milestoneType: number, _period: number): boolean => {
     const milestones14 = d.milestones14d || [];
     const milestones7 = d.milestones7d || [];
     const todosMilestones = [...milestones14, ...milestones7];

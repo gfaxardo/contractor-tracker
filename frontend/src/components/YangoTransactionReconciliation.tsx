@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api, YangoTransaction, YangoTransactionGroup, DriverByDate, MilestoneInstance } from '../services/api';
+import { api, YangoTransactionGroup, DriverByDate, MilestoneInstance } from '../services/api';
 
 const DEFAULT_PARK_ID = '08e20910d81d42658d4334d3f6d10ac0';
 
@@ -20,7 +20,6 @@ const YangoTransactionReconciliation: React.FC = () => {
   const [driverDateFrom, setDriverDateFrom] = useState('');
   const [driverDateTo, setDriverDateTo] = useState('');
   
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
   const [selectedDriver, setSelectedDriver] = useState<DriverByDate | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());

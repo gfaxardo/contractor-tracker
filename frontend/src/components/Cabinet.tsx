@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { api, LeadCabinetDTO, MilestoneInstance, DriverByDate, YangoTransactionMatched } from '../services/api';
+import { api, LeadCabinetDTO, MilestoneInstance, DriverByDate } from '../services/api';
 import MilestoneDetailModal from './MilestoneDetailModal';
 import Pagination from './Pagination';
 import { getCurrentWeekISO, formatWeekISO, getWeekRange, getPreviousWeek, getNextWeek } from '../utils/weekUtils';

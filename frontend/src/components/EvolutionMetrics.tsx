@@ -69,7 +69,6 @@ const EvolutionMetricsComponent: React.FC<EvolutionMetricsProps> = ({ parkId }) 
   }
 
   const maxTotal = Math.max(...datosActuales.map(d => d.totalDrivers), 0);
-  const maxTasa = Math.max(...datosActuales.map(d => Math.max(d.tasaRegistroAConexion, d.tasaConexionAViaje, d.tasaAlcanzo1Viaje)), 0);
   
   const calcularConectados = (item: EvolutionMetrics) => {
     return item.soloRegistro + item.conectoSinViajes + item.activoConViajes > 0 
@@ -141,7 +140,7 @@ const EvolutionMetricsComponent: React.FC<EvolutionMetricsProps> = ({ parkId }) 
                   </tr>
                 </thead>
                 <tbody>
-                  {datosActuales.map((item, index) => (
+                  {datosActuales.map((item) => (
                     <tr key={item.period} style={{ borderBottom: '1px solid #e5e7eb' }}>
                       <td style={{ padding: '8px', fontWeight: '500', position: 'sticky', left: 0, backgroundColor: 'white', fontSize: '11px' }}>
                         {item.period}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, Scout } from '../services/api';
-import { getCurrentWeekISO, getWeekRange, getPreviousWeek, getNextWeek, formatWeekISO, formatWeekRange } from '../utils/weekUtils';
+import { getPreviousWeek, getNextWeek, formatWeekRange } from '../utils/weekUtils';
 
 interface ScoutAffiliationControl {
   registrationId: number;

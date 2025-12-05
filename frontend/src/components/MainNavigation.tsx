@@ -14,7 +14,7 @@ interface NavItem {
   children?: NavItem[];
 }
 
-const MainNavigation: React.FC<MainNavigationProps> = ({ isOpen, onClose, currentPage, onNavigate }) => {
+const MainNavigation: React.FC<MainNavigationProps> = ({ isOpen, currentPage, onNavigate }) => {
   const navItems: NavItem[] = [
     {
       id: 'main',
