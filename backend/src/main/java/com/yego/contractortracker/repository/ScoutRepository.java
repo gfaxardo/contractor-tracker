@@ -1,0 +1,22 @@
+package com.yego.contractortracker.repository;
+
+import com.yego.contractortracker.entity.Scout;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface ScoutRepository extends JpaRepository<Scout, String> {
+    Optional<Scout> findByScoutName(String scoutName);
+}
+
+
+
+
+
+
+
+
+
+
