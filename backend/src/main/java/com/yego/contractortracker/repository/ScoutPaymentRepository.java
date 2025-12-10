@@ -22,3 +22,4 @@ public interface ScoutPaymentRepository extends JpaRepository<ScoutPayment, Long
 
 
 
+

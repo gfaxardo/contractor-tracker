@@ -1,9 +1,11 @@
 package com.yego.contractortracker.controller;
 
 import com.yego.contractortracker.dto.MilestoneInstanceDTO;
+import com.yego.contractortracker.dto.MilestonePaymentViewDTO;
 import com.yego.contractortracker.service.MilestoneProgressService;
 import com.yego.contractortracker.service.MilestoneTrackingService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -272,6 +274,65 @@ public class MilestoneController {
             error.put("error", e.getMessage());
             error.put("driverId", driverId);
             return ResponseEntity.status(500).body(error);
+        }
+    }
+    
+    @GetMapping("/payment-view/weekly")
+    public ResponseEntity<List<MilestonePaymentViewDTO>> getMilestonePaymentViewWeekly(
+            @RequestParam String weekISO,
+            @RequestParam(required = false) String parkId) {
+        try {
+            List<MilestonePaymentViewDTO> view = milestoneTrackingService.getMilestonePaymentViewWeekly(weekISO, parkId);
+            return ResponseEntity.ok(view);
+        } catch (Exception e) {
+            org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MilestoneController.class);
+            logger.error("Error al obtener vista de pagos semanal", e);
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    @GetMapping("/payment-view/daily")
+    public ResponseEntity<List<MilestonePaymentViewDTO>> getMilestonePaymentViewDaily(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(required = false) String parkId) {
+        try {
+            List<MilestonePaymentViewDTO> view = milestoneTrackingService.getMilestonePaymentViewDaily(fecha, parkId);
+            return ResponseEntity.ok(view);
+        } catch (Exception e) {
+            org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MilestoneController.class);
+            logger.error("Error al obtener vista de pagos diaria", e);
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    @GetMapping("/payment-view/range")
+    public ResponseEntity<List<MilestonePaymentViewDTO>> getMilestonePaymentViewRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+            @RequestParam(required = false) String parkId) {
+        try {
+            List<MilestonePaymentViewDTO> view = milestoneTrackingService.getMilestonePaymentViewByDateRange(fechaDesde, fechaHasta, parkId);
+            return ResponseEntity.ok(view);
+        } catch (Exception e) {
+            org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MilestoneController.class);
+            logger.error("Error al obtener vista de pagos por rango", e);
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    @GetMapping("/payment-view/pending")
+    public ResponseEntity<List<MilestonePaymentViewDTO>> getMilestonePaymentViewPending(
+            @RequestParam(required = false) String parkId,
+            @RequestParam(required = false) Integer milestoneType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta) {
+        try {
+            List<MilestonePaymentViewDTO> view = milestoneTrackingService.getMilestonePaymentViewPending(parkId, milestoneType, fechaDesde, fechaHasta);
+            return ResponseEntity.ok(view);
+        } catch (Exception e) {
+            org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MilestoneController.class);
+            logger.error("Error al obtener vista de pagos pendientes", e);
+            return ResponseEntity.status(500).build();
         }
     }
 }

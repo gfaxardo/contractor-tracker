@@ -1,6 +1,7 @@
 package com.yego.contractortracker.controller;
 
 import com.yego.contractortracker.dto.ScoutPaymentInstanceDTO;
+import com.yego.contractortracker.dto.ScoutWeeklyPaymentViewDTO;
 import com.yego.contractortracker.entity.ScoutPayment;
 import com.yego.contractortracker.entity.ScoutPaymentConfig;
 import com.yego.contractortracker.service.ScoutPaymentInstanceService;
@@ -309,6 +310,96 @@ public class ScoutPaymentController {
         } catch (Exception e) {
             response.put("status", "error");
             response.put("message", "Error al pagar todas las instancias: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+    
+    @GetMapping("/instances/weekly-view")
+    public ResponseEntity<Map<String, Object>> getWeeklyView(
+            @RequestParam String weekISO,
+            @RequestParam(required = false) String scoutId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            List<ScoutWeeklyPaymentViewDTO> vista = instanceService.obtenerVistaSemanal(weekISO);
+            
+            if (scoutId != null && !scoutId.trim().isEmpty()) {
+                vista = vista.stream()
+                        .filter(v -> v.getScoutId().equals(scoutId))
+                        .collect(java.util.stream.Collectors.toList());
+            }
+            
+            response.put("status", "success");
+            response.put("data", vista);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "Error al obtener vista semanal: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+    
+    @GetMapping("/instances/daily-view")
+    public ResponseEntity<Map<String, Object>> getDailyView(
+            @RequestParam String fecha,
+            @RequestParam(required = false) String scoutId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            LocalDate fechaLocal = LocalDate.parse(fecha);
+            ScoutPaymentInstanceService.VistaDiariaResultado resultado = instanceService.obtenerVistaDiariaConFecha(fechaLocal);
+            List<ScoutWeeklyPaymentViewDTO> vista = resultado.getVista();
+            
+            if (scoutId != null && !scoutId.trim().isEmpty()) {
+                vista = vista.stream()
+                        .filter(v -> v.getScoutId().equals(scoutId))
+                        .collect(java.util.stream.Collectors.toList());
+            }
+            
+            response.put("status", "success");
+            response.put("data", vista);
+            response.put("fechaSolicitada", fecha);
+            response.put("fechaUsada", resultado.getFechaUsada().toString());
+            response.put("hizoFallback", resultado.isHizoFallback());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "Error al obtener vista diaria: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+    
+    @GetMapping("/instances/historical-view")
+    public ResponseEntity<Map<String, Object>> getHistoricalView(
+            @RequestParam(required = false, defaultValue = "3") Integer meses,
+            @RequestParam(required = false, defaultValue = "0") Integer offset,
+            @RequestParam(required = false, defaultValue = "50") Integer limit,
+            @RequestParam(required = false) String scoutId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Map<String, Object> resultado = instanceService.obtenerVistaHistorica(meses, offset, limit);
+            
+            @SuppressWarnings("unchecked")
+            List<ScoutWeeklyPaymentViewDTO> vista = (List<ScoutWeeklyPaymentViewDTO>) resultado.get("data");
+            
+            if (scoutId != null && !scoutId.trim().isEmpty()) {
+                vista = vista.stream()
+                        .filter(v -> v.getScoutId().equals(scoutId))
+                        .collect(java.util.stream.Collectors.toList());
+            }
+            
+            response.put("status", "success");
+            response.put("data", vista);
+            response.put("total", resultado.get("total"));
+            response.put("hasMore", resultado.get("hasMore"));
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "Error al obtener vista histórica: " + e.getMessage());
             return ResponseEntity.status(500).body(response);
         }
     }

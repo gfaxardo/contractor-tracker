@@ -14,6 +14,7 @@ import AuditLogs from './components/AuditLogs';
 import AppLayout from './components/AppLayout';
 import Pagination from './components/Pagination';
 import Login from './components/Login';
+import MilestonePaymentView from './components/MilestonePaymentView';
 import { useAuth } from './contexts/AuthContext';
 import { api, DriverOnboarding, OnboardingFilters, MilestoneInstance, PaginatedResponse } from './services/api';
 import { getCurrentWeekISO, formatWeekISO, getWeekRange } from './utils/weekUtils';
@@ -23,7 +24,7 @@ const DEFAULT_PARK_ID = '08e20910d81d42658d4334d3f6d10ac0';
 
 type Page = 'main' | 'reconciliation-leads' | 'reconciliation-transactions' | 'reconciliation-scouts' | 'reconciliation-dashboard' | 
             'cabinet' | 'reprocess' | 'scouts-upload' | 'scouts-reconciliation' | 'scouts-transactions' | 
-            'scouts-management' | 'scouts-liquidation' | 'scouts-instances' | 'scouts-config' | 'scouts-affiliation' | 'audit';
+            'scouts-management' | 'scouts-liquidation' | 'scouts-instances' | 'scouts-config' | 'scouts-affiliation' | 'audit' | 'milestones-payment-view';
 
 function App() {
   const { isAuthenticated, loading: authLoading, token } = useAuth();
@@ -483,6 +484,10 @@ function App() {
 
     if (currentPage === 'audit') {
       return <AuditLogs />;
+    }
+
+    if (currentPage === 'milestones-payment-view') {
+      return <MilestonePaymentView />;
     }
 
     return (

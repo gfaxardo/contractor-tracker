@@ -1,9 +1,11 @@
 package com.yego.contractortracker.service;
 
 import com.yego.contractortracker.dto.MilestoneInstanceDTO;
+import com.yego.contractortracker.dto.MilestonePaymentViewDTO;
 import com.yego.contractortracker.dto.MilestoneTripDetailDTO;
 import com.yego.contractortracker.entity.MilestoneInstance;
 import com.yego.contractortracker.repository.MilestoneInstanceRepository;
+import com.yego.contractortracker.util.WeekISOUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -38,6 +41,9 @@ public class MilestoneTrackingService {
     @Autowired
     private org.springframework.context.ApplicationContext applicationContext;
     
+    @Autowired
+    private YangoTransactionRematchService yangoTransactionRematchService;
+    
     private static final int BATCH_SIZE = 10;
     
     public String calcularInstanciasAsync(String parkId, int periodDays) {
@@ -64,6 +70,12 @@ public class MilestoneTrackingService {
             
             MilestoneTrackingService self = applicationContext.getBean(MilestoneTrackingService.class);
             self.calcularInstanciasAsyncInternal(jobId, parkId, periodDays, milestoneType, hireDateFrom, hireDateTo);
+            
+            // Iniciar re-matching automático de transacciones Yango en paralelo
+            String rematchJobId = "yango-rematch-milestones-" + System.currentTimeMillis();
+            logger.info("Iniciando re-matching automático de transacciones Yango en paralelo. JobId: {}", rematchJobId);
+            yangoTransactionRematchService.rematchAllTransactionsAsync(rematchJobId);
+            
             logger.info("Cálculo asíncrono iniciado - jobId: {} (el procesamiento continuará en segundo plano)", jobId);
             return jobId;
         } catch (Exception e) {
@@ -158,7 +170,9 @@ public class MilestoneTrackingService {
                         instance.setPeriodDays(periodDays);
                     }
                     
-                    instance.setFulfillmentDate(calculationDate);
+                    // Calcular fecha real de cumplimiento del milestone
+                    LocalDate fechaCumplimiento = calcularFechaCumplimientoMilestone(driverId, hireDate, milestoneType, periodDays);
+                    instance.setFulfillmentDate(fechaCumplimiento.atStartOfDay());
                     instance.setCalculationDate(calculationDate);
                     instance.setTripCount(totalViajes);
                     instance.setTripDetails(null);
@@ -436,6 +450,73 @@ public class MilestoneTrackingService {
         }
     }
     
+    /**
+     * Calcula la fecha real en que se alcanzó el milestone dentro del período.
+     * Retorna la fecha del primer día donde el acumulado de viajes >= milestoneType.
+     * 
+     * @param driverId ID del driver
+     * @param hireDate Fecha de contratación
+     * @param milestoneType Tipo de milestone (1, 5, 25)
+     * @param periodDays Días del período (14)
+     * @return Fecha de cumplimiento del milestone, o hireDate + periodDays - 1 si no se alcanza
+     */
+    private LocalDate calcularFechaCumplimientoMilestone(String driverId, LocalDate hireDate, int milestoneType, int periodDays) {
+        try {
+            LocalDate fechaFin = hireDate.plusDays(periodDays - 1);
+            
+            // Consultar viajes por día ordenados por fecha
+            String sql = "SELECT TO_DATE(sd.date_file, 'DD-MM-YYYY') as fecha, " +
+                    "  COALESCE(sd.count_orders_completed, 0) as viajes " +
+                    "FROM summary_daily sd " +
+                    "WHERE sd.driver_id = ? " +
+                    "  AND TO_DATE(sd.date_file, 'DD-MM-YYYY') >= ? " +
+                    "  AND TO_DATE(sd.date_file, 'DD-MM-YYYY') <= ? " +
+                    "ORDER BY TO_DATE(sd.date_file, 'DD-MM-YYYY') ASC";
+            
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, driverId, hireDate, fechaFin);
+            
+            if (rows.isEmpty()) {
+                // Si no hay datos, retornar último día del período
+                return fechaFin;
+            }
+            
+            int acumulado = 0;
+            for (Map<String, Object> row : rows) {
+                Object fechaObj = row.get("fecha");
+                Object viajesObj = row.get("viajes");
+                
+                if (fechaObj == null || viajesObj == null) continue;
+                
+                LocalDate fecha;
+                if (fechaObj instanceof java.sql.Date) {
+                    fecha = ((java.sql.Date) fechaObj).toLocalDate();
+                } else if (fechaObj instanceof LocalDate) {
+                    fecha = (LocalDate) fechaObj;
+                } else {
+                    continue;
+                }
+                
+                int viajes = ((Number) viajesObj).intValue();
+                acumulado += viajes;
+                
+                // Si alcanzamos el milestone, retornar esta fecha
+                if (acumulado >= milestoneType) {
+                    logger.debug("Milestone {} alcanzado para driver {} en fecha {}", milestoneType, driverId, fecha);
+                    return fecha;
+                }
+            }
+            
+            // Si no se alcanzó el milestone en el período, retornar último día
+            logger.debug("Milestone {} no alcanzado completamente para driver {} en período, retornando último día", milestoneType, driverId);
+            return fechaFin;
+            
+        } catch (Exception e) {
+            logger.error("Error al calcular fecha de cumplimiento del milestone {} para driver {}: {}", milestoneType, driverId, e.getMessage(), e);
+            // En caso de error, retornar último día del período como fallback
+            return hireDate.plusDays(periodDays - 1);
+        }
+    }
+    
     public int obtenerTotalViajesDriver(String driverId, int periodDays) {
         try {
             String sql = "SELECT SUM(COALESCE(sd.count_orders_completed, 0)) as total_viajes " +
@@ -594,6 +675,205 @@ public class MilestoneTrackingService {
             logger.error("Error al limpiar milestones para parkId: {}", parkId, e);
             throw new RuntimeException("Error al limpiar milestones: " + e.getMessage(), e);
         }
+    }
+    
+    public List<MilestonePaymentViewDTO> getMilestonePaymentViewWeekly(String weekISO, String parkId) {
+        parkId = parkId != null && !parkId.isEmpty() ? parkId : DEFAULT_PARK_ID;
+        
+        try {
+            LocalDate[] weekRange = WeekISOUtil.getWeekRange(weekISO);
+            if (weekRange == null || weekRange.length != 2) {
+                logger.warn("Semana ISO inválida: {}", weekISO);
+                return new ArrayList<>();
+            }
+            
+            LocalDate weekStart = weekRange[0];
+            LocalDate weekEnd = weekRange[1];
+            
+            return getMilestonePaymentViewByDateRange(weekStart, weekEnd, parkId);
+        } catch (Exception e) {
+            logger.error("Error al obtener vista de pagos semanal para semana {}: {}", weekISO, e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    
+    public List<MilestonePaymentViewDTO> getMilestonePaymentViewDaily(LocalDate fecha, String parkId) {
+        parkId = parkId != null && !parkId.isEmpty() ? parkId : DEFAULT_PARK_ID;
+        
+        try {
+            return getMilestonePaymentViewByDateRange(fecha, fecha, parkId);
+        } catch (Exception e) {
+            logger.error("Error al obtener vista de pagos diaria para fecha {}: {}", fecha, e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    
+    public List<MilestonePaymentViewDTO> getMilestonePaymentViewByDateRange(LocalDate fechaDesde, LocalDate fechaHasta, String parkId) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT ");
+        sql.append("  mi.id as milestone_instance_id, ");
+        sql.append("  mi.driver_id, ");
+        sql.append("  d.full_name as driver_name, ");
+        sql.append("  d.phone as driver_phone, ");
+        sql.append("  d.hire_date, ");
+        sql.append("  mi.milestone_type, ");
+        sql.append("  mi.period_days, ");
+        sql.append("  mi.fulfillment_date, ");
+        sql.append("  mi.trip_count, ");
+        sql.append("  yt.id as yango_transaction_id, ");
+        sql.append("  yt.amount_yango, ");
+        sql.append("  yt.transaction_date as yango_payment_date, ");
+        sql.append("  CASE WHEN yt.id IS NOT NULL THEN true ELSE false END as has_payment, ");
+        sql.append("  CASE WHEN lm.driver_id IS NOT NULL THEN true ELSE false END as has_lead_match ");
+        sql.append("FROM milestone_instances mi ");
+        sql.append("INNER JOIN drivers d ON d.driver_id = mi.driver_id ");
+        sql.append("INNER JOIN lead_matches lm ON lm.driver_id = mi.driver_id AND lm.is_discarded = false ");
+        sql.append("LEFT JOIN yango_transactions yt ON yt.milestone_instance_id = mi.id ");
+        sql.append("WHERE mi.period_days = 14 ");
+        sql.append("  AND mi.park_id = ? ");
+        sql.append("  AND DATE(d.hire_date) >= ? ");
+        sql.append("  AND DATE(d.hire_date) <= ? ");
+        sql.append("ORDER BY d.hire_date DESC, mi.driver_id, mi.milestone_type ");
+        
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                sql.toString(), 
+                parkId, 
+                fechaDesde, 
+                fechaHasta
+            );
+            
+            List<MilestonePaymentViewDTO> result = new ArrayList<>();
+            LocalDate now = LocalDate.now();
+            
+            for (Map<String, Object> row : rows) {
+                MilestonePaymentViewDTO dto = new MilestonePaymentViewDTO();
+                
+                // Driver info
+                dto.setDriverId((String) row.get("driver_id"));
+                dto.setDriverName((String) row.get("driver_name"));
+                dto.setDriverPhone((String) row.get("driver_phone"));
+                Object hireDateObj = row.get("hire_date");
+                if (hireDateObj instanceof java.sql.Date) {
+                    dto.setHireDate(((java.sql.Date) hireDateObj).toLocalDate());
+                } else if (hireDateObj instanceof LocalDate) {
+                    dto.setHireDate((LocalDate) hireDateObj);
+                }
+                
+                // Milestone info
+                Object milestoneIdObj = row.get("milestone_instance_id");
+                if (milestoneIdObj instanceof Number) {
+                    dto.setMilestoneInstanceId(((Number) milestoneIdObj).longValue());
+                }
+                Object milestoneTypeObj = row.get("milestone_type");
+                if (milestoneTypeObj instanceof Number) {
+                    dto.setMilestoneType(((Number) milestoneTypeObj).intValue());
+                }
+                Object periodDaysObj = row.get("period_days");
+                if (periodDaysObj instanceof Number) {
+                    dto.setPeriodDays(((Number) periodDaysObj).intValue());
+                }
+                Object fulfillmentDateObj = row.get("fulfillment_date");
+                if (fulfillmentDateObj instanceof java.sql.Timestamp) {
+                    dto.setFulfillmentDate(((java.sql.Timestamp) fulfillmentDateObj).toLocalDateTime());
+                } else if (fulfillmentDateObj instanceof LocalDateTime) {
+                    dto.setFulfillmentDate((LocalDateTime) fulfillmentDateObj);
+                }
+                Object tripCountObj = row.get("trip_count");
+                if (tripCountObj instanceof Number) {
+                    dto.setTripCount(((Number) tripCountObj).intValue());
+                }
+                
+                // Yango payment info
+                Object yangoTransactionIdObj = row.get("yango_transaction_id");
+                if (yangoTransactionIdObj instanceof Number) {
+                    dto.setYangoTransactionId(((Number) yangoTransactionIdObj).longValue());
+                }
+                Object amountYangoObj = row.get("amount_yango");
+                if (amountYangoObj instanceof BigDecimal) {
+                    dto.setAmountYango((BigDecimal) amountYangoObj);
+                } else if (amountYangoObj instanceof Number) {
+                    dto.setAmountYango(BigDecimal.valueOf(((Number) amountYangoObj).doubleValue()));
+                }
+                Object yangoPaymentDateObj = row.get("yango_payment_date");
+                if (yangoPaymentDateObj instanceof java.sql.Timestamp) {
+                    dto.setYangoPaymentDate(((java.sql.Timestamp) yangoPaymentDateObj).toLocalDateTime());
+                } else if (yangoPaymentDateObj instanceof LocalDateTime) {
+                    dto.setYangoPaymentDate((LocalDateTime) yangoPaymentDateObj);
+                }
+                Object hasPaymentObj = row.get("has_payment");
+                if (hasPaymentObj instanceof Boolean) {
+                    dto.setHasPayment((Boolean) hasPaymentObj);
+                } else {
+                    dto.setHasPayment(false);
+                }
+                
+                // Lead match info
+                Object hasLeadMatchObj = row.get("has_lead_match");
+                if (hasLeadMatchObj instanceof Boolean) {
+                    dto.setHasLeadMatch((Boolean) hasLeadMatchObj);
+                } else {
+                    // Si hay INNER JOIN con lead_matches, siempre será true
+                    dto.setHasLeadMatch(true);
+                }
+                
+                // Payment status
+                if (dto.getHasPayment() != null && dto.getHasPayment()) {
+                    dto.setPaymentStatus("paid");
+                } else {
+                    LocalDate fulfillmentDate = dto.getFulfillmentDate() != null ? 
+                        dto.getFulfillmentDate().toLocalDate() : null;
+                    if (fulfillmentDate != null) {
+                        long daysSinceFulfillment = java.time.temporal.ChronoUnit.DAYS.between(fulfillmentDate, now);
+                        if (daysSinceFulfillment <= 7) {
+                            dto.setPaymentStatus("pending");
+                        } else {
+                            dto.setPaymentStatus("missing");
+                        }
+                    } else {
+                        dto.setPaymentStatus("missing");
+                    }
+                }
+                
+                result.add(dto);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            logger.error("Error al ejecutar consulta de vista de pagos: {}", e.getMessage(), e);
+            throw new RuntimeException("Error al obtener vista de pagos: " + e.getMessage(), e);
+        }
+    }
+    
+    public List<MilestonePaymentViewDTO> getMilestonePaymentViewPending(String parkId, Integer milestoneType, LocalDate fechaDesde, LocalDate fechaHasta) {
+        // Si no se especifica rango de fechas, usar un rango amplio (últimos 6 meses)
+        if (fechaDesde == null) {
+            fechaDesde = LocalDate.now().minusMonths(6);
+        }
+        if (fechaHasta == null) {
+            fechaHasta = LocalDate.now();
+        }
+        
+        // Obtener todos los milestones en el rango
+        List<MilestonePaymentViewDTO> allMilestones = getMilestonePaymentViewByDateRange(fechaDesde, fechaHasta, parkId);
+        
+        // Filtrar solo los pendientes (sin pago o con estado missing/pending)
+        return allMilestones.stream()
+            .filter(dto -> {
+                // Filtrar por milestoneType si se especifica
+                if (milestoneType != null && !dto.getMilestoneType().equals(milestoneType)) {
+                    return false;
+                }
+                
+                // Filtrar por pagos pendientes
+                Boolean hasPayment = dto.getHasPayment();
+                String paymentStatus = dto.getPaymentStatus();
+                
+                // Pendiente si no tiene pago o el estado es missing/pending
+                return hasPayment == null || !hasPayment || 
+                       "missing".equals(paymentStatus) || "pending".equals(paymentStatus);
+            })
+            .collect(java.util.stream.Collectors.toList());
     }
 }
 

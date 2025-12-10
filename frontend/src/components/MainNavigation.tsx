@@ -29,7 +29,8 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ isOpen, currentPage, on
         { id: 'reconciliation-leads', label: 'Leads vs Drivers' },
         { id: 'reconciliation-transactions', label: 'Transacciones vs Drivers' },
         { id: 'reconciliation-scouts', label: 'Registros de Scouts vs Drivers' },
-        { id: 'reconciliation-dashboard', label: 'Dashboard de Métricas' }
+        { id: 'reconciliation-dashboard', label: 'Dashboard de Métricas' },
+        { id: 'milestones-payment-view', label: 'Milestones vs Pagos Yango' }
       ]
     },
     {
@@ -65,7 +66,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ isOpen, currentPage, on
 
   const [expandedItems, setExpandedItems] = React.useState<Set<string>>(() => {
     const initial = new Set<string>();
-    if (currentPage.startsWith('reconciliation-')) {
+    if (currentPage.startsWith('reconciliation-') || currentPage === 'milestones-payment-view') {
       initial.add('reconciliation');
     } else if (currentPage === 'cabinet' || currentPage === 'reprocess') {
       initial.add('leads-management');
@@ -80,7 +81,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ isOpen, currentPage, on
 
   React.useEffect(() => {
     const newExpanded = new Set<string>();
-    if (currentPage.startsWith('reconciliation-')) {
+    if (currentPage.startsWith('reconciliation-') || currentPage === 'milestones-payment-view') {
       newExpanded.add('reconciliation');
     } else if (currentPage === 'cabinet' || currentPage === 'reprocess') {
       newExpanded.add('leads-management');

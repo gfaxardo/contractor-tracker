@@ -3,6 +3,8 @@ package com.yego.contractortracker.controller;
 import com.yego.contractortracker.dto.YangoTransactionGroup;
 import com.yego.contractortracker.entity.YangoTransaction;
 import com.yego.contractortracker.service.YangoTransactionService;
+import com.yego.contractortracker.service.YangoTransactionRematchService;
+import com.yego.contractortracker.service.MilestoneProgressService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,12 @@ public class YangoTransactionController {
     
     @Autowired
     private YangoTransactionService transactionService;
+    
+    @Autowired
+    private YangoTransactionRematchService rematchService;
+    
+    @Autowired
+    private MilestoneProgressService progressService;
     
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> uploadTransactionsCSV(@RequestParam("file") MultipartFile file) {
@@ -226,6 +234,59 @@ public class YangoTransactionController {
             return ResponseEntity.ok(metadata);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
+        }
+    }
+    
+    @PostMapping("/rematch-all")
+    public ResponseEntity<Map<String, Object>> rematchAllTransactions() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Generar jobId para seguimiento
+            String jobId = "yango-rematch-" + System.currentTimeMillis();
+            
+            // Iniciar re-matching asíncrono
+            rematchService.rematchAllTransactionsAsync(jobId);
+            
+            response.put("status", "success");
+            response.put("message", "Re-matching iniciado");
+            response.put("jobId", jobId);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "Error al iniciar re-matching: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+    
+    @GetMapping("/rematch-progress/{jobId}")
+    public ResponseEntity<Map<String, Object>> getRematchProgress(@PathVariable String jobId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            MilestoneProgressService.ProgressInfo progress = progressService.getProgress(jobId);
+            
+            if (progress == null) {
+                response.put("status", "not_found");
+                response.put("message", "Job no encontrado");
+                return ResponseEntity.status(404).body(response);
+            }
+            
+            response.put("status", "success");
+            response.put("data", Map.of(
+                "status", progress.getStatus(),
+                "totalTransactions", progress.getTotalDrivers(),
+                "processedTransactions", progress.getProcessedDrivers(),
+                "progressPercentage", progress.getProgressPercentage(),
+                "error", progress.getError() != null ? progress.getError() : ""
+            ));
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", "Error al obtener progreso: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
         }
     }
 }

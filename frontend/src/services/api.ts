@@ -83,6 +83,42 @@ export interface MilestoneInstance {
   tripDetails?: MilestoneTripDetail[];
 }
 
+export interface MilestonePaymentViewItem {
+  driverId: string;
+  driverName: string;
+  driverPhone: string | null;
+  hireDate: string;
+  milestoneInstanceId: number;
+  milestoneType: number;
+  periodDays: number;
+  fulfillmentDate: string;
+  tripCount: number;
+  yangoTransactionId: number | null;
+  amountYango: number | null;
+  yangoPaymentDate: string | null;
+  hasPayment: boolean;
+  paymentStatus: 'paid' | 'missing' | 'pending';
+  hasLeadMatch?: boolean;
+}
+
+export interface YangoRematchProgress {
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  totalTransactions: number;
+  processedTransactions: number;
+  progressPercentage: number;
+  error?: string;
+}
+
+export interface YangoPaymentConfig {
+  id: number;
+  milestoneType: number;
+  amountYango: number;
+  periodDays: number;
+  isActive: boolean;
+  createdAt: string;
+  lastUpdated: string;
+}
+
 export interface YangoTransactionMatched {
   id: number;
   transactionDate: string;
@@ -329,6 +365,45 @@ export interface Scout {
   lastUpdated: string;
 }
 
+export interface ScoutProfile {
+  scoutId: string;
+  scoutName: string;
+  driverId: string | null;
+  isActive: boolean;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  startDate: string | null;
+  status: string | null;
+  contractType: string | null;
+  workType: string | null;
+  paymentMethod: string | null;
+  bankAccount: string | null;
+  commissionRate: number | null;
+  createdAt: string;
+  lastUpdated: string;
+  totalRegistrations: number | null;
+  matchedRegistrations: number | null;
+  totalDriversAffiliated: number | null;
+  lastRegistrationDate: string | null;
+}
+
+export interface ScoutProfileUpdate {
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  startDate?: string | null;
+  status?: string | null;
+  contractType?: string | null;
+  workType?: string | null;
+  paymentMethod?: string | null;
+  bankAccount?: string | null;
+  commissionRate?: number | null;
+  isActive?: boolean;
+}
+
 export interface YangoTransaction {
   id: number;
   transactionDate: string;
@@ -425,6 +500,51 @@ export interface ScoutLiquidationCalculation {
   totalAmount: number;
   transactionsCount: number;
   milestoneCounts: Record<number, number>;
+}
+
+export interface DriverWeeklyInfo {
+  driverId: string;
+  driverName: string;
+  driverPhone: string | null;
+  registrationDate: string;
+  hireDate: string;
+  hasConnection: boolean;
+  reachedMilestone1: boolean;
+  reachedMilestone5: boolean;
+  reachedMilestone25: boolean;
+  milestone1Date: string | null;
+  milestone5Date: string | null;
+  milestone25Date: string | null;
+  scoutReached8Registrations: boolean;
+  isEligible: boolean;
+  eligibilityReason: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'cancelled' | 'partial_paid' | 'all_paid';
+  instanceId: number | null;
+  
+  // Campos individuales por milestone
+  milestone1Status?: string | null;
+  milestone1Amount?: number;
+  milestone1InstanceId?: number | null;
+  
+  milestone5Status?: string | null;
+  milestone5Amount?: number;
+  milestone5InstanceId?: number | null;
+  
+  milestone25Status?: string | null;
+  milestone25Amount?: number;
+  milestone25InstanceId?: number | null;
+  
+  // Estados de expiración para milestones no alcanzados
+  milestone1ExpirationStatus?: 'in_progress' | 'expired' | null;
+  milestone5ExpirationStatus?: 'in_progress' | 'expired' | null;
+  milestone25ExpirationStatus?: 'in_progress' | 'expired' | null;
+}
+
+export interface ScoutWeeklyView {
+  scoutId: string;
+  scoutName: string;
+  drivers: DriverWeeklyInfo[];
 }
 
 export const api = {
@@ -1089,6 +1209,40 @@ export const api = {
     return result.data;
   },
 
+  async getScoutProfile(scoutId: string): Promise<ScoutProfile> {
+    const response = await fetch(`${API_BASE_URL}/scouts/${scoutId}/profile`, {
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return result.data;
+  },
+
+  async updateScoutProfile(scoutId: string, profile: ScoutProfileUpdate): Promise<ScoutProfile> {
+    const response = await fetch(`${API_BASE_URL}/scouts/${scoutId}/profile`, {
+      method: 'PUT',
+      headers: obtenerHeaders(),
+      body: JSON.stringify(profile)
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return result.data;
+  },
+
   async getScoutDrivers(scoutId: string): Promise<DriverByDate[]> {
     const response = await fetch(`${API_BASE_URL}/scouts/${scoutId}/drivers`, {
       headers: obtenerHeaders()
@@ -1302,6 +1456,85 @@ export const api = {
     
     const result = await response.json();
     return result.data;
+  },
+
+  async getScoutWeeklyPaymentView(weekISO: string, scoutId?: string): Promise<ScoutWeeklyView[]> {
+    const params = new URLSearchParams();
+    params.append('weekISO', weekISO);
+    if (scoutId) {
+      params.append('scoutId', scoutId);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/scout-payments/instances/weekly-view?${params.toString()}`, {
+      method: 'GET',
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return result.data;
+  },
+
+  async getScoutDailyPaymentView(fecha: string, scoutId?: string): Promise<{ data: ScoutWeeklyView[]; fechaUsada: string; hizoFallback: boolean }> {
+    const params = new URLSearchParams();
+    params.append('fecha', fecha);
+    if (scoutId) {
+      params.append('scoutId', scoutId);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/scout-payments/instances/daily-view?${params.toString()}`, {
+      method: 'GET',
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return {
+      data: result.data,
+      fechaUsada: result.fechaUsada || fecha,
+      hizoFallback: result.hizoFallback || false
+    };
+  },
+
+  async getScoutHistoricalPaymentView(meses: number, offset: number, limit: number, scoutId?: string): Promise<{ data: ScoutWeeklyView[]; total: number; hasMore: boolean }> {
+    const params = new URLSearchParams();
+    params.append('meses', meses.toString());
+    params.append('offset', offset.toString());
+    params.append('limit', limit.toString());
+    if (scoutId) {
+      params.append('scoutId', scoutId);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/scout-payments/instances/historical-view?${params.toString()}`, {
+      method: 'GET',
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return {
+      data: result.data,
+      total: result.total || 0,
+      hasMore: result.hasMore || false
+    };
   },
 
   async uploadScoutRegistrations(file: File): Promise<any> {
@@ -1719,6 +1952,190 @@ export const api = {
     }
     
     return response.json();
+  },
+
+  async getMilestonePaymentViewWeekly(weekISO: string, parkId?: string): Promise<MilestonePaymentViewItem[]> {
+    const params = new URLSearchParams();
+    params.append('weekISO', weekISO);
+    if (parkId) {
+      params.append('parkId', parkId);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/milestones/payment-view/weekly?${params.toString()}`, {
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  async getMilestonePaymentViewDaily(fecha: string, parkId?: string): Promise<MilestonePaymentViewItem[]> {
+    const params = new URLSearchParams();
+    params.append('fecha', fecha);
+    if (parkId) {
+      params.append('parkId', parkId);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/milestones/payment-view/daily?${params.toString()}`, {
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  async getMilestonePaymentViewRange(fechaDesde: string, fechaHasta: string, parkId?: string): Promise<MilestonePaymentViewItem[]> {
+    const params = new URLSearchParams();
+    params.append('fechaDesde', fechaDesde);
+    params.append('fechaHasta', fechaHasta);
+    if (parkId) {
+      params.append('parkId', parkId);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/milestones/payment-view/range?${params.toString()}`, {
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  async getMilestonePaymentViewPending(parkId?: string, milestoneType?: number, fechaDesde?: string, fechaHasta?: string): Promise<MilestonePaymentViewItem[]> {
+    const params = new URLSearchParams();
+    if (parkId) {
+      params.append('parkId', parkId);
+    }
+    if (milestoneType !== undefined) {
+      params.append('milestoneType', milestoneType.toString());
+    }
+    if (fechaDesde) {
+      params.append('fechaDesde', fechaDesde);
+    }
+    if (fechaHasta) {
+      params.append('fechaHasta', fechaHasta);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/milestones/payment-view/pending?${params.toString()}`, {
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  async getYangoPaymentConfig(): Promise<YangoPaymentConfig[]> {
+    const response = await fetch(`${API_BASE_URL}/yango-payment-config`, {
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.data || data;
+  },
+
+  async getYangoPaymentConfigByPeriod(periodDays: number): Promise<YangoPaymentConfig[]> {
+    const response = await fetch(`${API_BASE_URL}/yango-payment-config/period/${periodDays}`, {
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.data || data;
+  },
+
+  async updateYangoPaymentConfig(id: number, amountYango: number, periodDays: number, isActive: boolean): Promise<YangoPaymentConfig> {
+    const response = await fetch(`${API_BASE_URL}/yango-payment-config/${id}`, {
+      method: 'PUT',
+      headers: obtenerHeaders(),
+      body: JSON.stringify({
+        amountYango,
+        periodDays,
+        isActive
+      })
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.data || data;
+  },
+
+  async rematchYangoTransactions(): Promise<{ jobId: string }> {
+    const response = await fetch(`${API_BASE_URL}/yango-transactions/rematch-all`, {
+      method: 'POST',
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return { jobId: data.jobId };
+  },
+
+  async getYangoRematchProgress(jobId: string): Promise<YangoRematchProgress> {
+    const response = await fetch(`${API_BASE_URL}/yango-transactions/rematch-progress/${jobId}`, {
+      method: 'GET',
+      headers: obtenerHeaders()
+    });
+    
+    await manejarRespuesta(response);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Job no encontrado');
+      }
+      const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+      throw new Error(error.message || `Error ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.data;
   }
 };
 
