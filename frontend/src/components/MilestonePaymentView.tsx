@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api, MilestonePaymentViewItem, YangoRematchProgress, YangoPaymentConfig, MilestoneInstance } from '../services/api';
-import { getCurrentWeekISO, getPreviousWeek, getNextWeek, formatWeekRange, formatWeekISO, getWeekRange } from '../utils/weekUtils';
+import { getCurrentWeekISO, getPreviousWeek, getNextWeek, formatWeekRange, formatWeekISO } from '../utils/weekUtils';
 
 type TabType = 'weekly' | 'daily' | 'range' | 'pending';
 
@@ -17,11 +17,11 @@ const MilestonePaymentView: React.FC = () => {
   });
   const [weekSelector, setWeekSelector] = useState('');
   const [dateSelector, setDateSelector] = useState('');
-  const [rematchJobId, setRematchJobId] = useState<string | null>(null);
+  const [_rematchJobId, setRematchJobId] = useState<string | null>(null);
   const [rematchProgress, setRematchProgress] = useState<YangoRematchProgress | null>(null);
   const [rematchLoading, setRematchLoading] = useState(false);
   const [rematchNotification, setRematchNotification] = useState<string | null>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Estados para modal de detalles de viajes
   const [showTripDetailsModal, setShowTripDetailsModal] = useState(false);
@@ -711,9 +711,6 @@ const MilestonePaymentView: React.FC = () => {
       return sum + (esperado - pagado);
     }, 0);
   
-  const totalAmountExpected = filteredData.reduce((sum, d) => {
-    return sum + calcularMontoAcumulativoEsperado(d.milestoneType, d.periodDays);
-  }, 0);
 
   const renderTripDetailsModal = () => {
     if (!showTripDetailsModal) return null;
@@ -1028,7 +1025,7 @@ const MilestonePaymentView: React.FC = () => {
                   {yangoConfigs
                     .filter(c => c.periodDays === 14)
                     .sort((a, b) => a.milestoneType - b.milestoneType)
-                    .map((config, index) => {
+                    .map((config) => {
                       const acumulativo = calcularMontoAcumulativoEsperado(config.milestoneType, config.periodDays);
                       const isEditing = editingConfig?.id === config.id;
                       

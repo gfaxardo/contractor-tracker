@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { api, Scout, ScoutWeeklyView, DriverWeeklyInfo } from '../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { api, Scout, ScoutWeeklyView } from '../services/api';
 import { getCurrentWeekISO, getPreviousWeek, getNextWeek, formatWeekRange, formatWeekISO, getWeekRange } from '../utils/weekUtils';
 
 type TabType = 'weekly' | 'daily' | 'historical';
@@ -21,7 +21,7 @@ const ScoutPaymentInstances: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedDrivers, setSelectedDrivers] = useState<Set<string>>(new Set());
   const [fechaUsadaDiaria, setFechaUsadaDiaria] = useState<string | null>(null);
-  const [hizoFallbackDiaria, setHizoFallbackDiaria] = useState(false);
+  const [_hizoFallbackDiaria, setHizoFallbackDiaria] = useState(false);
   const [filters, setFilters] = useState({
     scoutId: '',
     hasConnection: '',
@@ -249,7 +249,7 @@ const ScoutPaymentInstances: React.FC = () => {
     }
   };
 
-  const handleToggleDriver = (scoutId: string, driverId: string, instanceId: number | null) => {
+  const handleToggleDriver = (scoutId: string, driverId: string, instanceId: number | null | undefined) => {
     if (!instanceId) return;
     const key = `${scoutId}-${driverId}-${instanceId}`;
     const newSelected = new Set(selectedDrivers);
@@ -261,31 +261,6 @@ const ScoutPaymentInstances: React.FC = () => {
     setSelectedDrivers(newSelected);
   };
 
-  const handleToggleAllScout = (scoutId: string, drivers: DriverWeeklyInfo[]) => {
-    // Obtener todas las instancias pendientes de todos los milestones
-    const pendingKeys: string[] = [];
-    drivers.forEach(driver => {
-      if (driver.milestone1InstanceId && driver.milestone1Status === 'pending') {
-        pendingKeys.push(`${scoutId}-${driver.driverId}-${driver.milestone1InstanceId}`);
-      }
-      if (driver.milestone5InstanceId && driver.milestone5Status === 'pending') {
-        pendingKeys.push(`${scoutId}-${driver.driverId}-${driver.milestone5InstanceId}`);
-      }
-      if (driver.milestone25InstanceId && driver.milestone25Status === 'pending') {
-        pendingKeys.push(`${scoutId}-${driver.driverId}-${driver.milestone25InstanceId}`);
-      }
-    });
-    
-    const allSelected = pendingKeys.length > 0 && pendingKeys.every(key => selectedDrivers.has(key));
-    
-    const newSelected = new Set(selectedDrivers);
-    if (allSelected) {
-      pendingKeys.forEach(key => newSelected.delete(key));
-    } else {
-      pendingKeys.forEach(key => newSelected.add(key));
-    }
-    setSelectedDrivers(newSelected);
-  };
 
   const handlePagarSeleccionados = async () => {
     if (selectedDrivers.size === 0) {
